@@ -2,18 +2,20 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import glob, os
 
 ## SETTING #########################################################
 # This code visualizes a designated FPGA composition with the given
 # tile information extracted from Vivado.
-# - case 0: if mainTiles is not empty, the code draws map for only mainTiles,
-# - case 1: if mainTiles is empty and isConcise is True, the code draws concise version of map,
-# - case 2: if mainTiles is empty and isConcise is False, the code draws detailed version.
+# - case 0: if MAIN_TYPES is not empty, the code draws map for only MAIN_TYPES,
+# - case 1: if MAIN_TYPES is empty and IS_CONCISE is True, the code draws concise version of map,
+# - case 2: if MAIN_TYPES is empty and IS_CONCISE is False, the code draws detailed version.
 
-mainTiles = []
-# mainTiles = ["BRAM", "CLB", "CLK", "DSP", "INT", "IO", "PS"]
-isConcise = True
-csvFileName = "zedboard.csv"  # tile information
+# MAIN_TYPES = []
+MAIN_TYPES = ["BRAM", "CLB", "CLK", "DSP", "INT", "IO", "PS"]
+IS_CONCISE = True
+BOARD_NAME = "vc707"
+FILE_PATH = "./data/" + BOARD_NAME  # tile information
 pd.set_option('display.max_columns', None)  # print all cols
 ####################################################################
 
@@ -57,13 +59,13 @@ def genVerbose(tile_df, deviceMat, rowIDs, colIDs):
 
 
 # In mainTypes version, it draws map only for tiles in mailTypes list.
-# e.g. if CLB is in mainTiles, CLBLL_L, CLBLL_R, CLBLM_L, CLBLM_R are all considered CLB.
-# if CLB is NOT in mainTiles, they are considered "empty"
-def genMainTypes(tile_df, mainTiles, deviceMat, rowIDs, colIDs):
+# e.g. if CLB is in mainTypes, CLBLL_L, CLBLL_R, CLBLM_L, CLBLM_R are all considered CLB.
+# if CLB is NOT in mainTypes, they are considered "empty"
+def genMainTypes(tile_df, mainTypes, deviceMat, rowIDs, colIDs):
     tile_df['isMainTile'] = "no"  # initialized
     tile_df['Main Type'] = tile_df["Type"]  # initialized
     # print(tile_df)
-    for elem in mainTiles:
+    for elem in mainTypes:
         tile_df.loc[tile_df['Type'].str.startswith(elem), "isMainTile"] = "yes"
         tile_df.loc[tile_df['Type'].str.startswith(elem), "Main Type"] = elem
 
@@ -101,7 +103,11 @@ def matShow(data, numIDs, nullID, types):
 
 
 def main():
-    tile_df = pd.read_csv(csvFileName)
+    all_files = glob.glob(FILE_PATH + "*.csv")
+    each_file_df = (pd.read_csv(f) for f in all_files)
+    concatenated_df = pd.concat(each_file_df, ignore_index=True)
+    tile_df = concatenated_df
+    # tile_df = pd.read_csv(csvFileName)
     rowMax = tile_df['Row'].max()
     colMax = tile_df['Col'].max()
     tile_df = tile_df.drop('Sites', 1)
@@ -122,13 +128,13 @@ def main():
     # and the "empty" tile type is colored grey
     deviceMat = np.zeros((rowIDs.max() + 1, colIDs.max() + 1))
 
-    if(len(mainTiles) == 0):
-        if(isConcise):
+    if(len(MAIN_TYPES) == 0):
+        if(IS_CONCISE):
             (deviceMat, numIDs, types, nullID) = genConcise(tile_df, deviceMat, rowIDs, colIDs)
         else:
             (deviceMat, numIDs, types, nullID) = genVerbose(tile_df, deviceMat, rowIDs, colIDs)
     else:
-        (deviceMat, numIDs, types, nullID) = genMainTypes(tile_df, mainTiles, deviceMat, rowIDs, colIDs)
+        (deviceMat, numIDs, types, nullID) = genMainTypes(tile_df, MAIN_TYPES, deviceMat, rowIDs, colIDs)
 
     matShow(deviceMat, numIDs, nullID, types)
     plt.show()
